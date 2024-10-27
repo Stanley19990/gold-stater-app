@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
 declare global {
@@ -28,30 +28,14 @@ export default function GoldStaterApp() {
   const [goldStaters, setGoldStaters] = useState(0)
   const [lastClaimTime, setLastClaimTime] = useState(0)
   const [activeSection, setActiveSection] = useState('dashboard')
-
   const [telegramId, setTelegramId] = useState<number | null>(null)
-  useEffect(() => {
-    if (typeof window !== 'undefined' && window.Telegram) {
-      window.Telegram.WebApp.ready()
-      const tgId = window.Telegram.WebApp.initDataUnsafe?.user?.id
-      setTelegramId(tgId!)
-      if (tgId) {
-        fetchUserData(tgId)
-      }
-    }
-  }, [])
 
-  const fetchUserData = async (tgId: number) => {
-    // ... function body
-  }
-
-  const init = async () => {
-
+  const fetchUserData = useCallback(async (tgId: number) => {
     const { data, error } = await supabase
-    .from('users')
-    .select('gold_staters, last_claim_time')
-    .eq('telegram_id', telegramId)
-    .single()
+      .from('users')
+      .select('gold_staters, last_claim_time')
+      .eq('telegram_id', tgId)
+      .single()
 
     if (error) {
       console.error('Error fetching user data:', error)
@@ -62,21 +46,12 @@ export default function GoldStaterApp() {
       // New user, create a record
       const { error } = await supabase
         .from('users')
-        .insert({ telegram_id: telegramId, gold_staters: 0, last_claim_time: 0 })
+        .insert({ telegram_id: tgId, gold_staters: 0, last_claim_time: 0 })
       if (error) console.error('Error creating user:', error)
     }
+  }, [])
 
-  }
-
-  init();
-
- const handleClaim = () => {
-  // This fonction raise the claim feature
-
- }
-  
-
-  const updateUserData = async () => {
+  const updateUserData = useCallback(async () => {
     if (telegramId) {
       const { error } = await supabase
         .from('users')
@@ -84,7 +59,7 @@ export default function GoldStaterApp() {
         .eq('telegram_id', telegramId)
       if (error) console.error('Error updating user data:', error)
     }
-  }
+  }, [telegramId, goldStaters, lastClaimTime])
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.Telegram) {
@@ -95,10 +70,24 @@ export default function GoldStaterApp() {
         fetchUserData(tgId)
       }
     }
-  }, [])
+  }, [fetchUserData])
+
+  useEffect(() => {
+    updateUserData()
+  }, [goldStaters, lastClaimTime, updateUserData])
+
+  const handleClaim = useCallback(() => {
+    const currentTime = Date.now()
+    if (currentTime - lastClaimTime >= 24 * 60 * 60 * 1000) {
+      setGoldStaters(prevGoldStaters => prevGoldStaters + 5)
+      setLastClaimTime(currentTime)
+    } else {
+      alert("You can only claim once every 24 hours!")
+    }
+  }, [lastClaimTime])
 
   const renderSection = () => {
-    switch (activeSection) {
+    switch(activeSection) {
       case 'wallet':
         return <div>Wallet Balance: {goldStaters} Gold Staters</div>
       case 'tasks':
@@ -111,8 +100,8 @@ export default function GoldStaterApp() {
         return (
           <div className="flex flex-col items-center">
             <div className="text-2xl font-bold mb-4">{goldStaters} Gold Staters</div>
-            <button
-              onClick={handleClaim}
+            <button 
+              onClick={handleClaim} 
               className="w-32 h-32 rounded-full bg-yellow-400 hover:bg-yellow-500 flex items-center justify-center text-4xl mb-4"
             >
               🪙
