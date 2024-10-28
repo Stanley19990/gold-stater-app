@@ -27,7 +27,7 @@ declare global {
 export default function GoldStaterApp() {
   const [goldStaters, setGoldStaters] = useState(0)
   const [lastClaimTime, setLastClaimTime] = useState(0)
-  const [activeSection, setActiveSection] = useState('dashboard')
+  const [activeTab, setActiveTab] = useState('dashboard')
   const [telegramId, setTelegramId] = useState<number | null>(null)
 
   const fetchUserData = useCallback(async (tgId: number) => {
@@ -86,20 +86,49 @@ export default function GoldStaterApp() {
     }
   }, [lastClaimTime])
 
-  const renderSection = () => {
-    switch(activeSection) {
+  const renderTabContent = () => {
+    switch(activeTab) {
       case 'wallet':
-        return <div>Wallet Balance: {goldStaters} Gold Staters</div>
+        return (
+          <div className="p-4">
+            <h2 className="text-2xl font-bold mb-4">Wallet</h2>
+            <p className="text-lg">Balance: {goldStaters} Gold Staters</p>
+          </div>
+        )
       case 'tasks':
-        return <div>Daily Task: Claim your Gold Staters!</div>
+        return (
+          <div className="p-4">
+            <h2 className="text-2xl font-bold mb-4">Daily Tasks</h2>
+            <p className="text-lg">Claim your daily Gold Staters!</p>
+            <button 
+              onClick={handleClaim}
+              className="mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+            >
+              Claim Reward
+            </button>
+          </div>
+        )
       case 'referrals':
-        return <div>Invite friends to earn more Gold Staters!</div>
+        return (
+          <div className="p-4">
+            <h2 className="text-2xl font-bold mb-4">Referrals</h2>
+            <p className="text-lg">Invite friends to earn more Gold Staters!</p>
+            {/* Add referral code or link here */}
+          </div>
+        )
       case 'profile':
-        return <div>Your Profile (Telegram ID: {telegramId})</div>
+        return (
+          <div className="p-4">
+            <h2 className="text-2xl font-bold mb-4">Profile</h2>
+            <p className="text-lg">Telegram ID: {telegramId}</p>
+            {/* Add more profile information here */}
+          </div>
+        )
       default:
         return (
-          <div className="flex flex-col items-center">
-            <div className="text-2xl font-bold mb-4">{goldStaters} Gold Staters</div>
+          <div className="p-4 flex flex-col items-center">
+            <h2 className="text-2xl font-bold mb-4">Dashboard</h2>
+            <div className="text-4xl font-bold mb-4">{goldStaters} Gold Staters</div>
             <button 
               onClick={handleClaim} 
               className="w-32 h-32 rounded-full bg-yellow-400 hover:bg-yellow-500 flex items-center justify-center text-4xl mb-4"
@@ -117,15 +146,23 @@ export default function GoldStaterApp() {
       <header className="bg-blue-600 text-white p-4">
         <h1 className="text-2xl font-bold">Gold Stater App</h1>
       </header>
-      <main className="flex-grow p-4">
-        {renderSection()}
+      <main className="flex-grow">
+        {renderTabContent()}
       </main>
-      <nav className="bg-gray-200 p-4 flex justify-around">
-        <button onClick={() => setActiveSection('dashboard')}>Dashboard</button>
-        <button onClick={() => setActiveSection('wallet')}>Wallet</button>
-        <button onClick={() => setActiveSection('tasks')}>Tasks</button>
-        <button onClick={() => setActiveSection('referrals')}>Referrals</button>
-        <button onClick={() => setActiveSection('profile')}>Profile</button>
+      <nav className="bg-gray-200 p-2 flex justify-around">
+        {['dashboard', 'wallet', 'tasks', 'referrals', 'profile'].map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2 rounded-md ${
+              activeTab === tab
+                ? 'bg-blue-500 text-white'
+                : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+            }`}
+          >
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </button>
+        ))}
       </nav>
     </div>
   )
