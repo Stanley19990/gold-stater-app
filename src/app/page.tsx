@@ -142,19 +142,19 @@ export default function GoldStaterApp() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-gray-100">
-      <header className="bg-blue-600 text-white p-4">
+    <div className="flex flex-col h-screen bg-gray-100">
+      <header className="bg-blue-600 text-white p-4 fixed top-0 left-0 right-0 z-10">
         <h1 className="text-2xl font-bold">Gold Stater App</h1>
       </header>
-      <main className="flex-grow">
+      <main className="flex-grow overflow-y-auto mt-16 mb-16 p-4">
         {renderTabContent()}
       </main>
-      <nav className="bg-gray-200 p-2 flex justify-around">
+      <nav className="bg-gray-200 p-2 flex justify-around fixed bottom-0 left-0 right-0 z-10">
         {['dashboard', 'wallet', 'tasks', 'referrals', 'profile'].map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 rounded-md ${
+            className={`px-2 py-1 text-xs sm:text-sm sm:px-4 sm:py-2 rounded-md ${
               activeTab === tab
                 ? 'bg-blue-500 text-white'
                 : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
