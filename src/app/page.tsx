@@ -208,7 +208,7 @@ export default function GoldStaterApp() {
                 ))}
               </ul>
             ) : (
-              <p className="mb-4">You haven't referred anyone yet. Start inviting friends!</p>
+              <p className="mb-4">You have not referred anyone yet. Start inviting friends!</p>
             )}
 
             <div className="mt-8">
