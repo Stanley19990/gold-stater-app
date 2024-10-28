@@ -17,6 +17,9 @@ declare global {
         initDataUnsafe: {
           user?: {
             id: number;
+            username: string;
+            first_name: string;
+            last_name: string;
           };
         };
       };
@@ -29,6 +32,10 @@ export default function GoldStaterApp() {
   const [lastClaimTime, setLastClaimTime] = useState(0)
   const [activeTab, setActiveTab] = useState('dashboard')
   const [telegramId, setTelegramId] = useState<number | null>(null)
+  const [telegramUsername, setTelegramUsername] = useState<string | null>(null)
+  const [referrals, setReferrals] = useState<Array<{ id: number, username: string, dailyEarnings: number }>>([])
+  const [dailyReferralEarnings, setDailyReferralEarnings] = useState(0)
+  const [inviteLink, setInviteLink] = useState('')
 
   const fetchUserData = useCallback(async (tgId: number) => {
     const { data, error } = await supabase
@@ -61,16 +68,39 @@ export default function GoldStaterApp() {
     }
   }, [telegramId, goldStaters, lastClaimTime])
 
+  const fetchReferralData = useCallback(async () => {
+    if (telegramId) {
+      const { data, error } = await supabase
+        .from('referrals')
+        .select('id, username, daily_earnings')
+        .eq('referrer_id', telegramId)
+
+      if (error) {
+        console.error('Error fetching referral data:', error)
+      } else if (data) {
+        setReferrals(data.map(r => ({
+          id: r.id,
+          username: r.username,
+          dailyEarnings: r.daily_earnings
+        })))
+        setDailyReferralEarnings(data.reduce((sum, r) => sum + r.daily_earnings, 0))
+      }
+    }
+  }, [telegramId])
+
   useEffect(() => {
     if (typeof window !== 'undefined' && window.Telegram) {
       window.Telegram.WebApp.ready()
-      const tgId = window.Telegram.WebApp.initDataUnsafe?.user?.id
-      if (tgId) {
-        setTelegramId(tgId)
-        fetchUserData(tgId)
+      const tgUser = window.Telegram.WebApp.initDataUnsafe?.user
+      if (tgUser) {
+        setTelegramId(tgUser.id)
+        setTelegramUsername(tgUser.username || `${tgUser.first_name} ${tgUser.last_name}`)
+        fetchUserData(tgUser.id)
+        fetchReferralData()
+        setInviteLink(`https://t.me/YourBotUsername?start=${tgUser.id}`)
       }
     }
-  }, [fetchUserData])
+  }, [fetchUserData, fetchReferralData])
 
   useEffect(() => {
     updateUserData()
@@ -86,13 +116,56 @@ export default function GoldStaterApp() {
     }
   }, [lastClaimTime])
 
+  const claimReferralEarnings = useCallback(async () => {
+    if (telegramId && dailyReferralEarnings > 0) {
+      const { error } = await supabase
+        .from('users')
+        .update({ 
+          gold_staters: goldStaters + dailyReferralEarnings,
+          last_referral_claim: new Date().toISOString()
+        })
+        .eq('telegram_id', telegramId)
+
+      if (error) {
+        console.error('Error claiming referral earnings:', error)
+      } else {
+        setGoldStaters(prevStaters => prevStaters + dailyReferralEarnings)
+        setDailyReferralEarnings(0)
+        // Reset daily earnings for referrals
+        await supabase
+          .from('referrals')
+          .update({ daily_earnings: 0 })
+          .eq('referrer_id', telegramId)
+      }
+    }
+  }, [telegramId, dailyReferralEarnings, goldStaters])
+
+  const copyInviteLink = useCallback(() => {
+    navigator.clipboard.writeText(inviteLink)
+      .then(() => alert('Invite link copied to clipboard!'))
+      .catch(err => console.error('Failed to copy invite link:', err))
+  }, [inviteLink])
+
   const renderTabContent = () => {
     switch(activeTab) {
       case 'wallet':
         return (
           <div className="p-4">
             <h2 className="text-2xl font-bold mb-4">Wallet</h2>
-            <p className="text-lg">Balance: {goldStaters} Gold Staters</p>
+            <div className="bg-yellow-100 p-6 rounded-lg shadow-md">
+              <p className="text-3xl font-bold text-yellow-800 mb-2">
+                {goldStaters.toFixed(2)} Gold Staters
+              </p>
+              <p className="text-sm text-yellow-700">
+                Last claim: {new Date(lastClaimTime).toLocaleString()}
+              </p>
+            </div>
+            <button 
+              onClick={handleClaim}
+              className="mt-4 bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-4 rounded"
+            >
+              Claim Daily Reward
+            </button>
           </div>
         )
       case 'tasks':
@@ -112,16 +185,63 @@ export default function GoldStaterApp() {
         return (
           <div className="p-4">
             <h2 className="text-2xl font-bold mb-4">Referrals</h2>
-            <p className="text-lg">Invite friends to earn more Gold Staters!</p>
-            {/* Add referral code or link here */}
+            <p className="text-lg mb-4">Earn 1.5% from buddies + 0.5% from their referrals.</p>
+            
+            <div className="bg-blue-100 p-4 rounded-lg mb-4 flex justify-between items-center">
+              <span className="text-xl font-semibold">Daily Earnings: {dailyReferralEarnings.toFixed(2)} Coins</span>
+              <button 
+                onClick={claimReferralEarnings}
+                className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+                disabled={dailyReferralEarnings === 0}
+              >
+                Claim
+              </button>
+            </div>
+
+            <h3 className="text-xl font-semibold mb-2">Your Referrals:</h3>
+            {referrals.length > 0 ? (
+              <ul className="list-disc pl-5 mb-4">
+                {referrals.map(referral => (
+                  <li key={referral.id} className="mb-2">
+                    {referral.username} - Daily Earnings: {referral.dailyEarnings.toFixed(2)} Coins
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mb-4">You haven't referred anyone yet. Start inviting friends!</p>
+            )}
+
+            <div className="mt-8">
+              <p className="text-sm mb-2">Your Unique Invite Link:</p>
+              <div className="flex items-center">
+                <input 
+                  type="text" 
+                  value={inviteLink} 
+                  readOnly 
+                  className="flex-grow p-2 border rounded-l-md"
+                />
+                <button
+                  onClick={copyInviteLink}
+                  className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-r-md"
+                >
+                  Invide Fren
+                </button>
+              </div>
+            </div>
           </div>
         )
       case 'profile':
         return (
           <div className="p-4">
             <h2 className="text-2xl font-bold mb-4">Profile</h2>
-            <p className="text-lg">Telegram ID: {telegramId}</p>
-            {/* Add more profile information here */}
+            <div className="bg-white p-6 rounded-lg shadow-md">
+              <p className="text-lg mb-2">
+                <span className="font-semibold">Telegram ID:</span> {telegramId}
+              </p>
+              <p className="text-lg">
+                <span className="font-semibold">Username:</span> {telegramUsername || 'Not set'}
+              </p>
+            </div>
           </div>
         )
       default:
